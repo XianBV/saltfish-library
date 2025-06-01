@@ -1,0 +1,202 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id            String   @id @default(cuid())
+  telegramId    String   @unique @map("telegram_id")
+  username      String?
+  firstName     String?  @map("first_name")
+  lastName      String?  @map("last_name")
+  bio           String?
+  avatarUrl     String?  @map("avatar_url")
+  createdAt     DateTime @default(now()) @map("created_at")
+  updatedAt     DateTime @updatedAt @map("updated_at")
+
+  // Relations
+  novels        Novel[]
+  lists         List[]
+  novelAuthors  NovelAuthor[]
+  statsDaily    StatDaily[]
+
+  @@map("users")
+}
+
+model Novel {
+  id                    String   @id @default(cuid())
+  title                 String
+  originalTitle         String   @map("original_title")
+  alternativeTitles     String[] @map("alternative_titles")
+  description           String?
+  coverUrl              String?  @map("cover_url")
+  year                  Int?
+  chaptersInOriginal    Int      @map("chapters_in_original")
+  wordCount             Int?     @map("word_count")
+  originalStatus        NovelStatus @map("original_status")
+  translationStatus     NovelStatus @map("translation_status")
+  isPublic              Boolean  @default(false) @map("is_public")
+  shareToken            String?  @unique @map("share_token")
+  createdAt             DateTime @default(now()) @map("created_at")
+  updatedAt             DateTime @updatedAt @map("updated_at")
+
+  // Relations
+  userId        String   @map("user_id")
+  user          User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  chapters      Chapter[]
+  novelTags     NovelTag[]
+  novelAuthors  NovelAuthor[]
+  listItems     ListItem[]
+  statsDaily    StatDaily[]
+
+  @@map("novels")
+}
+
+model Chapter {
+  id              String   @id @default(cuid())
+  title           String
+  volumeArk       String?  @map("volume_ark")
+  content         String
+  order           Int
+  storageLocation StorageLocation @default(SUPABASE) @map("storage_location")
+  fileUrl         String?  @map("file_url")
+  createdAt       DateTime @default(now()) @map("created_at")
+  updatedAt       DateTime @updatedAt @map("updated_at")
+
+  // Relations
+  novelId   String @map("novel_id")
+  novel     Novel  @relation(fields: [novelId], references: [id], onDelete: Cascade)
+
+  @@map("chapters")
+}
+
+model Author {
+  id        String   @id @default(cuid())
+  name      String   @unique
+  createdAt DateTime @default(now()) @map("created_at")
+
+  // Relations
+  novelAuthors NovelAuthor[]
+
+  @@map("authors")
+}
+
+model NovelAuthor {
+  id       String @id @default(cuid())
+  novelId  String @map("novel_id")
+  authorId String @map("author_id")
+  userId   String @map("user_id")
+
+  novel  Novel  @relation(fields: [novelId], references: [id], onDelete: Cascade)
+  author Author @relation(fields: [authorId], references: [id], onDelete: Cascade)
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([novelId, authorId])
+  @@map("novel_authors")
+}
+
+model Tag {
+  id        String   @id @default(cuid())
+  name      String   @unique
+  type      TagType
+  createdAt DateTime @default(now()) @map("created_at")
+
+  // Relations
+  novelTags NovelTag[]
+
+  @@map("tags")
+}
+
+model NovelTag {
+  id      String @id @default(cuid())
+  novelId String @map("novel_id")
+  tagId   String @map("tag_id")
+
+  novel Novel @relation(fields: [novelId], references: [id], onDelete: Cascade)
+  tag   Tag   @relation(fields: [tagId], references: [id], onDelete: Cascade)
+
+  @@unique([novelId, tagId])
+  @@map("novel_tags")
+}
+
+model List {
+  id        String   @id @default(cuid())
+  name      String
+  type      ListType
+  order     Int      @default(0)
+  createdAt DateTime @default(now()) @map("created_at")
+
+  // Relations
+  userId    String     @map("user_id")
+  user      User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  listItems ListItem[]
+
+  @@unique([userId, name])
+  @@map("lists")
+}
+
+model ListItem {
+  id        String   @id @default(cuid())
+  addedAt   DateTime @default(now()) @map("added_at")
+
+  // Relations
+  listId  String @map("list_id")
+  novelId String @map("novel_id")
+  
+  list  List  @relation(fields: [listId], references: [id], onDelete: Cascade)
+  novel Novel @relation(fields: [novelId], references: [id], onDelete: Cascade)
+
+  @@unique([listId, novelId])
+  @@map("list_items")
+}
+
+model StatDaily {
+  id        String   @id @default(cuid())
+  date      DateTime @db.Date
+  views     Int      @default(0)
+  additions Int      @default(0)
+  createdAt DateTime @default(now()) @map("created_at")
+
+  // Relations
+  novelId String @map("novel_id")
+  userId  String @map("user_id")
+  
+  novel Novel @relation(fields: [novelId], references: [id], onDelete: Cascade)
+  user  User  @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([novelId, userId, date])
+  @@map("stats_daily")
+}
+
+// Enums
+enum NovelStatus {
+  COMPLETED
+  ONGOING
+  HIATUS
+}
+
+enum StorageLocation {
+  SUPABASE
+  R2
+}
+
+enum ListType {
+  SYSTEM
+  CUSTOM
+}
+
+enum TagType {
+  GENRE
+  STATUS_WORK
+  STATUS_TRANSLATION
+  PUBLISH_DATE
+  VOLUME
+  ORIENTATION
+  PERSPECTIVE
+  ERA
+}
