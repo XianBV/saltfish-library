@@ -143,7 +143,9 @@ export class NovelFiltersDto {
   @IsOptional()
   @IsArray()
   @IsString({ each: true })
-  @Transform(({ value }) => Array.isArray(value) ? value : [value])
+  @Transform(({ value }: { value: string | string[] }) =>
+    Array.isArray(value) ? value : [value]
+  )
   tags?: string[];
 
   @IsOptional()
