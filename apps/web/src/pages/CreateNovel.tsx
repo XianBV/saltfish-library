@@ -1,114 +1,93 @@
-import { useState } from "react";
-import { useNavigate } from "react-router-dom";
-import { createNovel } from "../utils/api";
-import { Input } from "@/components/ui/input";
-import { Button } from "@/components/ui/button";
-import { Textarea } from "@/components/ui/textarea";
-import { Card, CardContent } from "@/components/ui/card";
-import { MultiSelect } from "@/components/ui/multiselect";
+import { useState } from 'react';
+import { useRouter } from 'next/router';
+import { createNovel } from '@/lib/api';
+import { TAG_OPTIONS, ORIENTATION_OPTIONS, PERSPECTIVE_OPTIONS, ERA_OPTIONS } from '@/lib/constants';
 
-const TAG_OPTIONS = [
-  "система",
-  "сянься",
-  "в будущем",
-  "конец света",
-  "фэнтези",
-  "богатая семья",
-  "без CP",
-  "чистая любовь",
-  "романтика",
-  "ABO",
-  "кампус",
-  "межзвёздное",
-  "QT",
-  "прямой эфир",
-  "любовный контракт",
-  "переносное пространство",
-  "онлайн-игры",
-  "варьете",
-  "прошлая и настоящая жизни",
-  "цундэрэ",
-  "злоупотребление",
-  "множественные личности",
-  "еда"
-];
-
-export default function CreateNovelPage() {
+export default function CreateNovel() {
+  const router = useRouter();
   const [form, setForm] = useState({
-    coverUrl: "",
-    titleOriginal: "",
-    titleTranslated: "",
-    altTitles: ["", "", ""],
-    author: "",
-    year: "",
-    chaptersCount: "",
-    wordCount: "",
-    statusOriginal: "завершено",
-    statusTranslation: "сериализация",
-    description: "",
-    tags: [] as string[],
+    title: '',
+    originalTitle: '',
+    description: '',
+    coverUrl: '',
+    year: '',
+    chaptersInOriginal: '',
+    wordCount: '',
+    originalStatus: 'ongoing',
+    translationStatus: 'ongoing',
+    tags: [],
+    orientation: '',
+    perspective: '',
+    era: ''
   });
 
-  const navigate = useNavigate();
-  const [loading, setLoading] = useState(false);
-
-  const handleChange = (e: any) => {
+  const handleChange = (e) => {
     const { name, value } = e.target;
-    setForm((prev) => ({ ...prev, [name]: value }));
+    setForm(prev => ({ ...prev, [name]: value }));
   };
 
-  const handleAltTitleChange = (i: number, value: string) => {
-    const alt = [...form.altTitles];
-    alt[i] = value;
-    setForm((prev) => ({ ...prev, altTitles: alt }));
+  const handleCheckboxChange = (e) => {
+    const { value, checked } = e.target;
+    setForm(prev => ({
+      ...prev,
+      tags: checked ? [...prev.tags, value] : prev.tags.filter(tag => tag !== value)
+    }));
   };
 
-  const handleSubmit = async () => {
-    setLoading(true);
-    const novel = await createNovel(form);
-    navigate(`/novel/${novel.id}`);
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    await createNovel({
+      ...form,
+      year: parseInt(form.year),
+      chaptersInOriginal: parseInt(form.chaptersInOriginal),
+      wordCount: parseInt(form.wordCount)
+    });
+    router.push('/');
   };
 
   return (
-    <div className="max-w-2xl mx-auto p-4 space-y-4">
-      <h1 className="text-xl font-bold">Добавить новеллу</h1>
-      <Card>
-        <CardContent className="space-y-4 p-4">
-          <Input name="coverUrl" value={form.coverUrl} onChange={handleChange} placeholder="URL обложки *" />
-          <Input name="titleOriginal" value={form.titleOriginal} onChange={handleChange} placeholder="Название оригинала *" />
-          <Input name="titleTranslated" value={form.titleTranslated} onChange={handleChange} placeholder="Название перевода *" />
+    <form onSubmit={handleSubmit} className="space-y-4 p-4">
+      <input type="text" name="title" placeholder="Название" value={form.title} onChange={handleChange} required />
+      <input type="text" name="originalTitle" placeholder="Оригинальное название" value={form.originalTitle} onChange={handleChange} required />
+      <textarea name="description" placeholder="Описание" value={form.description} onChange={handleChange} />
+      <input type="text" name="coverUrl" placeholder="Ссылка на обложку" value={form.coverUrl} onChange={handleChange} />
+      <input type="number" name="year" placeholder="Год публикации" value={form.year} onChange={handleChange} />
+      <input type="number" name="chaptersInOriginal" placeholder="Глав в оригинале" value={form.chaptersInOriginal} onChange={handleChange} />
+      <input type="number" name="wordCount" placeholder="Количество слов в оригинале" value={form.wordCount} onChange={handleChange} />
+      <select name="originalStatus" value={form.originalStatus} onChange={handleChange}>
+        <option value="ongoing">Онгоинг</option>
+        <option value="completed">Завершено</option>
+      </select>
+      <select name="translationStatus" value={form.translationStatus} onChange={handleChange}>
+        <option value="ongoing">Онгоинг</option>
+        <option value="completed">Завершено</option>
+      </select>
 
-          {form.altTitles.map((title, i) => (
-            <Input
-              key={i}
-              value={title}
-              onChange={(e) => handleAltTitleChange(i, e.target.value)}
-              placeholder={`Альтернативное название ${i + 1}`}
-            />
-          ))}
+      <fieldset>
+        <legend>Теги</legend>
+        {TAG_OPTIONS.map(tag => (
+          <label key={tag}>
+            <input type="checkbox" value={tag} checked={form.tags.includes(tag)} onChange={handleCheckboxChange} /> {tag}
+          </label>
+        ))}
+      </fieldset>
 
-          <Input name="author" value={form.author} onChange={handleChange} placeholder="Автор *" />
-          <Input name="year" value={form.year} onChange={handleChange} placeholder="Год выпуска" />
-          <Input name="chaptersCount" value={form.chaptersCount} onChange={handleChange} placeholder="Глав в оригинале *" />
-          <Input name="wordCount" value={form.wordCount} onChange={handleChange} placeholder="Объём (слов)" />
+      <select name="orientation" value={form.orientation} onChange={handleChange}>
+        <option value="">Ориентация</option>
+        {ORIENTATION_OPTIONS.map(opt => <option key={opt} value={opt}>{opt}</option>)}
+      </select>
 
-          <Input name="statusOriginal" value={form.statusOriginal} onChange={handleChange} placeholder="Статус оригинала *" />
-          <Input name="statusTranslation" value={form.statusTranslation} onChange={handleChange} placeholder="Статус перевода *" />
+      <select name="perspective" value={form.perspective} onChange={handleChange}>
+        <option value="">Перспектива</option>
+        {PERSPECTIVE_OPTIONS.map(opt => <option key={opt} value={opt}>{opt}</option>)}
+      </select>
 
-          <Textarea name="description" value={form.description} onChange={handleChange} placeholder="Описание" />
+      <select name="era" value={form.era} onChange={handleChange}>
+        <option value="">Эра</option>
+        {ERA_OPTIONS.map(opt => <option key={opt} value={opt}>{opt}</option>)}
+      </select>
 
-          <MultiSelect
-            label="Жанры и теги"
-            options={TAG_OPTIONS}
-            selected={form.tags}
-            onChange={(tags) => setForm((prev) => ({ ...prev, tags }))}
-          />
-
-          <Button className="w-full" onClick={handleSubmit} disabled={loading}>
-            {loading ? "Сохранение..." : "Создать новеллу"}
-          </Button>
-        </CardContent>
-      </Card>
-    </div>
+      <button type="submit">Создать новеллу</button>
+    </form>
   );
 }

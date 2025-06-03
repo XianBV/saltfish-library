@@ -1,89 +1,104 @@
 import { useEffect, useState } from "react";
-import { useParams, useNavigate } from "react-router-dom";
-import { getNovelById } from "../utils/api";
-import { Card, CardContent } from "@/components/ui/card";
+import { useParams } from "react-router-dom";
+import { getNovelById, shareNovel, getChaptersByNovel } from "@/api/novels";
 import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
+import { Separator } from "@/components/ui/separator";
+import { Dialog, DialogTrigger, DialogContent } from "@/components/ui/dialog";
+import { ChapterEditor } from "@/components/ChapterEditor";
+import { ChapterCard } from "@/components/ChapterCard";
+import { cn } from "@/lib/utils";
 
-export default function NovelViewPage() {
+export default function NovelView() {
   const { id } = useParams();
-  const navigate = useNavigate();
-  const [novel, setNovel] = useState<any>(null);
-  const [loading, setLoading] = useState(true);
+  const [novel, setNovel] = useState(null);
+  const [chapters, setChapters] = useState([]);
+  const [expandedVolumes, setExpandedVolumes] = useState({});
+  const [isSharing, setIsSharing] = useState(false);
 
   useEffect(() => {
     if (id) {
-      getNovelById(id).then((res) => {
-        setNovel(res);
-        setLoading(false);
-      });
+      getNovelById(id).then(setNovel);
+      getChaptersByNovel(id).then(setChapters);
     }
   }, [id]);
 
-  if (loading) return <p className="p-4">Загрузка...</p>;
-  if (!novel) return <p className="p-4 text-red-500">Новелла не найдена.</p>;
+  const handleShare = async () => {
+    if (!novel) return;
+    setIsSharing(true);
+    const updated = await shareNovel(novel.id);
+    setNovel(updated);
+    setIsSharing(false);
+  };
+
+  const toggleVolume = (volume) => {
+    setExpandedVolumes((prev) => ({
+      ...prev,
+      [volume]: !prev[volume],
+    }));
+  };
+
+  const volumes = chapters.reduce((acc, chapter) => {
+    const volume = chapter.volumeArk || "Без тома/арки";
+    if (!acc[volume]) acc[volume] = [];
+    acc[volume].push(chapter);
+    return acc;
+  }, {});
+
+  if (!novel) return <p>Загрузка...</p>;
 
   return (
-    <div className="max-w-3xl mx-auto p-4 space-y-6">
-      <div className="flex gap-4">
-        <img
-          src={novel.coverUrl}
-          alt={novel.titleTranslated}
-          className="w-40 h-auto rounded shadow object-cover aspect-[3/4]"
-        />
-        <div className="flex-1 space-y-1">
-          <h1 className="text-xl font-bold">{novel.titleTranslated}</h1>
-          <div className="text-sm text-muted-foreground">
-            {novel.titleOriginal} · {novel.year || "Год неизвестен"}
-          </div>
-          <div className="text-sm">Автор: {novel.author}</div>
-          <div className="text-sm">Глав: {novel.chapters.length}</div>
-          <div className="text-sm">Статус: {novel.statusOriginal} / {novel.statusTranslation}</div>
-          <div className="flex flex-wrap gap-1 text-xs mt-1">
-            {novel.tags?.map((tag: string) => (
-              <span
-                key={tag}
-                className="bg-muted text-muted-foreground px-2 py-0.5 rounded"
-              >
-                {tag}
-              </span>
-            ))}
-          </div>
-        </div>
+    <div className="p-4 max-w-3xl mx-auto">
+      <h1 className="text-2xl font-bold mb-2">{novel.title}</h1>
+      <p className="text-muted-foreground mb-4">{novel.originalTitle}</p>
+      <img src={novel.coverUrl || "https://via.placeholder.com/300x400"} alt="cover" className="w-48 rounded mb-4" />
+      <p className="mb-2 whitespace-pre-line">{novel.description}</p>
+
+      <div className="flex gap-2 flex-wrap mb-4">
+        {novel.tags?.map((tag) => (
+          <Badge key={tag}>{tag}</Badge>
+        ))}
       </div>
 
-      <Card>
-        <CardContent className="p-4 space-y-2">
-          <h2 className="text-lg font-semibold">Описание</h2>
-          <p className="whitespace-pre-line text-sm text-muted-foreground">
-            {novel.description || "Описание отсутствует."}
-          </p>
-        </CardContent>
-      </Card>
+      <div className="mb-4">
+        <p><strong>Ориентация:</strong> {novel.orientation || "-"}</p>
+        <p><strong>Перспектива:</strong> {novel.perspective || "-"}</p>
+        <p><strong>Эра:</strong> {novel.era || "-"}</p>
+        <p><strong>Год:</strong> {novel.year || "-"}</p>
+        <p><strong>Слов:</strong> {novel.wordCount || "-"}</p>
+      </div>
 
-      <div className="space-y-2">
-        <div className="flex justify-between items-center">
-          <h2 className="text-lg font-semibold">Главы</h2>
-          <Button size="sm" onClick={() => navigate(`/novel/${novel.id}/add-chapter`)}>
-            ➕ Добавить главу
+      {!novel.isPublic && (
+        <Button onClick={handleShare} disabled={isSharing} className="mb-4">
+          {isSharing ? "Поделитесь..." : "Поделиться новеллой"}
+        </Button>
+      )}
+
+      <Separator className="my-6" />
+
+      <h2 className="text-xl font-semibold mb-4">Главы</h2>
+
+      {Object.entries(volumes).map(([volume, chaps]) => (
+        <div key={volume} className="mb-4">
+          <Button variant="ghost" onClick={() => toggleVolume(volume)} className="font-bold text-left">
+            {expandedVolumes[volume] ? "▼" : "►"} {volume}
           </Button>
+          {expandedVolumes[volume] && (
+            <div className="ml-4 mt-2 space-y-2">
+              {chaps.map((chapter) => (
+                <Dialog key={chapter.id}>
+                  <DialogTrigger asChild>
+                    <ChapterCard chapter={chapter} />
+                  </DialogTrigger>
+                  <DialogContent>
+                    <ChapterEditor chapter={chapter} novelId={novel.id} />
+                  </DialogContent>
+                </Dialog>
+              ))}
+            </div>
+          )}
         </div>
-
-        {novel.chapters.length === 0 ? (
-          <p className="text-sm text-muted-foreground">Глав пока нет.</p>
-        ) : (
-          <ul className="space-y-1">
-            {novel.chapters.map((ch: any) => (
-              <li
-                key={ch.id}
-                className="border px-3 py-2 rounded cursor-pointer hover:bg-muted"
-                onClick={() => navigate(`/chapter/${ch.id}`)}
-              >
-                {ch.title || `Глава ${ch.number}`}
-              </li>
-            ))}
-          </ul>
-        )}
-      </div>
+      ))}
     </div>
   );
 }

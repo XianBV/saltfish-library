@@ -1,68 +1,144 @@
-import { useState, useEffect } from "react";
-import { searchNovels } from "../utils/api";
+import { useEffect, useState } from "react";
+import { getNovels } from "@/lib/api";
+import { Novel } from "@/types";
+import NovelCard from "@/components/NovelCard";
 import { Input } from "@/components/ui/input";
-import { Button } from "@/components/ui/button";
-import { MultiSelect } from "@/components/ui/multiselect";
-import { Card, CardContent } from "@/components/ui/card";
+import { Label } from "@/components/ui/label";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Checkbox } from "@/components/ui/checkbox";
 
 const TAG_OPTIONS = [
-  "фэнтези", "система", "сянься", "возрождение", "богатая семья", "сладкая статья",
-  "альтернативная история", "будущее", "романтика", "чистая любовь", "без CP",
-  "ABO", "прямая трансляция", "QT", "конец света", "онлайн-игры", "варьете",
-  "контратака", "любовный контракт", "переносное пространство", "цундэрэ"
-];
+  "система", "сянься", "в будущем", "конец света", "фэнтези", "богатая семья", "без CP", "чистая любовь", "романтика", "ABO", "кампус", "межзвёздное",
+  "QT", "прямой эфир", "любовный контракт", "переносное пространство", "онлайн-игры", "варьете", "прошлая и настоящая жизни", "цундэрэ", "злоупотребление",
+  "множественные личности", "еда"];
+
+const orientations = ["Романтика", "Чистая любовь", "Лили", "Без CP"];
+const perspectives = ["Главный герой", "Главная героиня", "Гг-шоу", "Гг-гун", "Неизвестно"];
+const eras = ["Альтернативная история", "Современность", "Будущее"];
 
 export default function SearchPage() {
-  const [query, setQuery] = useState("");
-  const [selectedTags, setSelectedTags] = useState<string[]>([]);
-  const [results, setResults] = useState([]);
-  const [loading, setLoading] = useState(false);
+  const [novels, setNovels] = useState<Novel[]>([]);
+  const [search, setSearch] = useState("");
+  const [sortBy, setSortBy] = useState("title");
 
-  const handleSearch = async () => {
-    setLoading(true);
-    const novels = await searchNovels({ query, tags: selectedTags });
-    setResults(novels);
-    setLoading(false);
-  };
+  const [tags, setTags] = useState<string[]>([]);
+  const [orientation, setOrientation] = useState<string[]>([]);
+  const [perspective, setPerspective] = useState<string[]>([]);
+  const [era, setEra] = useState<string[]>([]);
+  const [strict, setStrict] = useState(false);
 
   useEffect(() => {
-    handleSearch(); // начальный поиск (вся библиотека)
-  }, []);
+    const fetchNovels = async () => {
+      const filters = {
+        search,
+        sortBy,
+        tags,
+        orientation,
+        perspective,
+        era,
+        strict
+      };
+      const data = await getNovels(filters);
+      setNovels(data);
+    };
+    fetchNovels();
+  }, [search, sortBy, tags, orientation, perspective, era, strict]);
+
+  const handleCheckboxChange = (setFn: (val: string[]) => void, values: string[], value: string) => {
+    setFn(values.includes(value) ? values.filter(v => v !== value) : [...values, value]);
+  };
 
   return (
-    <div className="max-w-3xl mx-auto p-4 space-y-4">
-      <h1 className="text-xl font-bold">Поиск и фильтрация</h1>
-      <div className="flex flex-col gap-3 md:flex-row md:items-center">
-        <Input
-          className="flex-1"
-          placeholder="Название или ключевые слова..."
-          value={query}
-          onChange={(e) => setQuery(e.target.value)}
-        />
-        <Button onClick={handleSearch} disabled={loading}>
-          {loading ? "Поиск..." : "Поиск"}
-        </Button>
-      </div>
-      <MultiSelect
-        label="Жанры и теги"
-        options={TAG_OPTIONS}
-        selected={selectedTags}
-        onChange={setSelectedTags}
+    <div className="p-4 space-y-6">
+      <h1 className="text-xl font-bold">Поиск новелл</h1>
+
+      <Input
+        placeholder="Название или описание"
+        value={search}
+        onChange={e => setSearch(e.target.value)}
       />
-      <div className="grid grid-cols-2 gap-4 md:grid-cols-3">
-        {results.map((novel: any) => (
-          <Card key={novel.id}>
-            <CardContent className="p-2 space-y-2">
-              <img
-                src={novel.coverUrl}
-                alt={novel.titleTranslated}
-                className="rounded w-full aspect-[3/4] object-cover"
-              />
-              <div className="text-sm text-center line-clamp-2">
-                {novel.titleTranslated}
-              </div>
-            </CardContent>
-          </Card>
+
+      <Select value={sortBy} onValueChange={setSortBy}>
+        <SelectTrigger className="w-[200px]">
+          <SelectValue placeholder="Сортировка" />
+        </SelectTrigger>
+        <SelectContent>
+          <SelectItem value="title">По названию</SelectItem>
+          <SelectItem value="year">По году</SelectItem>
+        </SelectContent>
+      </Select>
+
+      <div>
+        <Label>Теги</Label>
+        <div className="flex flex-wrap gap-2">
+          {allTags.map(tag => (
+            <Checkbox
+              key={tag}
+              checked={tags.includes(tag)}
+              onCheckedChange={() => handleCheckboxChange(setTags, tags, tag)}
+              label={tag}
+            />
+          ))}
+        </div>
+      </div>
+
+      <div>
+        <Label>Ориентация</Label>
+        <div className="flex flex-wrap gap-2">
+          {orientations.map(val => (
+            <Checkbox
+              key={val}
+              checked={orientation.includes(val)}
+              onCheckedChange={() => handleCheckboxChange(setOrientation, orientation, val)}
+              label={val}
+            />
+          ))}
+        </div>
+      </div>
+
+      <div>
+        <Label>Перспектива</Label>
+        <div className="flex flex-wrap gap-2">
+          {perspectives.map(val => (
+            <Checkbox
+              key={val}
+              checked={perspective.includes(val)}
+              onCheckedChange={() => handleCheckboxChange(setPerspective, perspective, val)}
+              label={val}
+            />
+          ))}
+        </div>
+      </div>
+
+      <div>
+        <Label>Эра</Label>
+        <div className="flex flex-wrap gap-2">
+          {eras.map(val => (
+            <Checkbox
+              key={val}
+              checked={era.includes(val)}
+              onCheckedChange={() => handleCheckboxChange(setEra, era, val)}
+              label={val}
+            />
+          ))}
+        </div>
+      </div>
+
+      <div>
+        <Label>
+          <input
+            type="checkbox"
+            checked={strict}
+            onChange={e => setStrict(e.target.checked)}
+            className="mr-2"
+          />
+          Строгая фильтрация
+        </Label>
+      </div>
+
+      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+        {novels.map(novel => (
+          <NovelCard key={novel.id} novel={novel} />
         ))}
       </div>
     </div>
