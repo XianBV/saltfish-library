@@ -1,68 +1,71 @@
-import { useState, useEffect } from "react";
-import { searchNovels } from "../utils/api";
-import { Input } from "@/components/ui/input";
-import { Button } from "@/components/ui/button";
-import { MultiSelect } from "@/components/ui/multiselect";
-import { Card, CardContent } from "@/components/ui/card";
-
-const TAG_OPTIONS = [
-  "фэнтези", "система", "сянься", "возрождение", "богатая семья", "сладкая статья",
-  "альтернативная история", "будущее", "романтика", "чистая любовь", "без CP",
-  "ABO", "прямая трансляция", "QT", "конец света", "онлайн-игры", "варьете",
-  "контратака", "любовный контракт", "переносное пространство", "цундэрэ"
-];
+import { useEffect, useState } from 'react';
+import { NovelCard } from '@/components/NovelCard';
+import { useFiltersStore } from '@/stores/filters';
+import { FiltersPanel } from '@/components/FiltersPanel';
+import { useUserStore } from '@/stores/user';
+import { Novel } from '@/types';
 
 export default function SearchPage() {
-  const [query, setQuery] = useState("");
-  const [selectedTags, setSelectedTags] = useState<string[]>([]);
-  const [results, setResults] = useState([]);
-  const [loading, setLoading] = useState(false);
-
-  const handleSearch = async () => {
-    setLoading(true);
-    const novels = await searchNovels({ query, tags: selectedTags });
-    setResults(novels);
-    setLoading(false);
-  };
+  const filters = useFiltersStore((state) => state.filters);
+  const [novels, setNovels] = useState<Novel[]>([]);
+  const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [page, setPage] = useState(1);
+  const user = useUserStore((state) => state.user);
 
   useEffect(() => {
-    handleSearch(); // начальный поиск (вся библиотека)
-  }, []);
+    const fetchNovels = async () => {
+      setIsLoading(true);
+      setError(null);
+      try {
+        const query = new URLSearchParams();
+
+        if (filters.search) query.append('search', filters.search);
+        if (filters.tags?.length) filters.tags.forEach(tag => query.append('tags', tag));
+        if (filters.originalStatus?.length) filters.originalStatus.forEach(status => query.append('originalStatus', status));
+        if (filters.translationStatus?.length) filters.translationStatus.forEach(status => query.append('translationStatus', status));
+        if (filters.year?.length === 2) {
+          query.append('yearFrom', filters.year[0].toString());
+          query.append('yearTo', filters.year[1].toString());
+        }
+        if (filters.wordCount?.length === 2) {
+          query.append('wordCountFrom', filters.wordCount[0].toString());
+          query.append('wordCountTo', filters.wordCount[1].toString());
+        }
+
+        // Новые поля
+        if (filters.orientation?.length) filters.orientation.forEach(value => query.append('orientation', value));
+        if (filters.perspective?.length) filters.perspective.forEach(value => query.append('perspective', value));
+        if (filters.era?.length) filters.era.forEach(value => query.append('era', value));
+
+        if (filters.sortBy) query.append('sortBy', filters.sortBy);
+        if (filters.strict) query.append('strict', 'true');
+
+        query.append('page', page.toString());
+
+        const res = await fetch(`/api/novels?${query.toString()}`);
+        if (!res.ok) throw new Error('Ошибка при загрузке новелл');
+        const data = await res.json();
+        setNovels(data);
+      } catch (err) {
+        console.error(err);
+        setError('Не удалось загрузить новеллы');
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    fetchNovels();
+  }, [filters, page]);
 
   return (
-    <div className="max-w-3xl mx-auto p-4 space-y-4">
-      <h1 className="text-xl font-bold">Поиск и фильтрация</h1>
-      <div className="flex flex-col gap-3 md:flex-row md:items-center">
-        <Input
-          className="flex-1"
-          placeholder="Название или ключевые слова..."
-          value={query}
-          onChange={(e) => setQuery(e.target.value)}
-        />
-        <Button onClick={handleSearch} disabled={loading}>
-          {loading ? "Поиск..." : "Поиск"}
-        </Button>
-      </div>
-      <MultiSelect
-        label="Жанры и теги"
-        options={TAG_OPTIONS}
-        selected={selectedTags}
-        onChange={setSelectedTags}
-      />
-      <div className="grid grid-cols-2 gap-4 md:grid-cols-3">
-        {results.map((novel: any) => (
-          <Card key={novel.id}>
-            <CardContent className="p-2 space-y-2">
-              <img
-                src={novel.coverUrl}
-                alt={novel.titleTranslated}
-                className="rounded w-full aspect-[3/4] object-cover"
-              />
-              <div className="text-sm text-center line-clamp-2">
-                {novel.titleTranslated}
-              </div>
-            </CardContent>
-          </Card>
+    <div className="p-4 space-y-4">
+      <FiltersPanel />
+      {isLoading && <p>Загрузка...</p>}
+      {error && <p className="text-red-500">{error}</p>}
+      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
+        {novels.map(novel => (
+          <NovelCard key={novel.id} novel={novel} />
         ))}
       </div>
     </div>
