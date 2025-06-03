@@ -1,16 +1,16 @@
-import { IsString, IsOptional, IsArray } from 'class-validator';
+import { IsArray, IsNotEmpty, IsOptional, IsString, ValidateNested } from 'class-validator';
+import { Type } from 'class-transformer';
 
 export class CreateChapterDto {
+  @IsNotEmpty()
   @IsString()
   title: string;
 
-  @IsOptional()
-  @IsString()
-  volumeArk?: string;
-
+  @IsNotEmpty()
   @IsString()
   content: string;
 
+  @IsNotEmpty()
   @IsString()
   novelId: string;
 }
@@ -19,10 +19,6 @@ export class UpdateChapterDto {
   @IsOptional()
   @IsString()
   title?: string;
-
-  @IsOptional()
-  @IsString()
-  volumeArk?: string;
 
   @IsOptional()
   @IsString()

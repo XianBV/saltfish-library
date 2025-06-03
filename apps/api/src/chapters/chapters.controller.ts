@@ -1,74 +1,55 @@
 import {
-  Controller,
-  Get,
-  Post,
   Body,
-  Patch,
-  Param,
+  Controller,
   Delete,
-  UseGuards,
+  Get,
+  Param,
+  Patch,
+  Post,
   Put,
+  Query,
+  UseGuards,
 } from '@nestjs/common';
-import { ApiTags, ApiOperation, ApiBearerAuth } from '@nestjs/swagger';
 import { ChaptersService } from './chapters.service';
-import { AuthGuard } from '../auth/auth.guard';
-import { CurrentUser } from '../auth/auth.decorator';
 import { CreateChapterDto, UpdateChapterDto, ReorderChaptersDto } from './dto';
+import { JwtAuthGuard } from '../auth/jwt-auth.guard';
+import { CurrentUser } from '../auth/current-user.decorator';
+import { UserPayload } from '../auth/types';
 
-@ApiTags('chapters')
 @Controller('chapters')
 export class ChaptersController {
   constructor(private readonly chaptersService: ChaptersService) {}
 
+  @UseGuards(JwtAuthGuard)
   @Post()
-  @UseGuards(AuthGuard)
-  @ApiBearerAuth()
-  @ApiOperation({ summary: 'Создать главу' })
-  create(@CurrentUser() user: any, @Body() createChapterDto: CreateChapterDto) {
-    return this.chaptersService.create(user.id, createChapterDto);
-  }
-
-  @Get('novel/:novelId')
-  @ApiOperation({ summary: 'Получить все главы новеллы' })
-  findAll(@Param('novelId') novelId: string) {
-    return this.chaptersService.findAll(novelId);
+  create(@Body() dto: CreateChapterDto, @CurrentUser() user: UserPayload) {
+    return this.chaptersService.create(dto, user.id);
   }
 
   @Get(':id')
-  @ApiOperation({ summary: 'Получить главу по ID' })
   findOne(@Param('id') id: string) {
     return this.chaptersService.findOne(id);
   }
 
-  @Patch(':id')
-  @UseGuards(AuthGuard)
-  @ApiBearerAuth()
-  @ApiOperation({ summary: 'Обновить главу' })
+  @UseGuards(JwtAuthGuard)
+  @Put(':id')
   update(
     @Param('id') id: string,
-    @CurrentUser() user: any,
-    @Body() updateChapterDto: UpdateChapterDto,
+    @Body() dto: UpdateChapterDto,
+    @CurrentUser() user: UserPayload,
   ) {
-    return this.chaptersService.update(id, user.id, updateChapterDto);
+    return this.chaptersService.update(id, dto, user.id);
   }
 
+  @UseGuards(JwtAuthGuard)
   @Delete(':id')
-  @UseGuards(AuthGuard)
-  @ApiBearerAuth()
-  @ApiOperation({ summary: 'Удалить главу' })
-  remove(@Param('id') id: string, @CurrentUser() user: any) {
+  remove(@Param('id') id: string, @CurrentUser() user: UserPayload) {
     return this.chaptersService.remove(id, user.id);
   }
 
-  @Put('novel/:novelId/reorder')
-  @UseGuards(AuthGuard)
-  @ApiBearerAuth()
-  @ApiOperation({ summary: 'Изменить порядок глав' })
-  reorder(
-    @Param('novelId') novelId: string,
-    @CurrentUser() user: any,
-    @Body() dto: ReorderChaptersDto,
-  ) {
-    return this.chaptersService.reorder(novelId, user.id, dto.chapterIds);
+  @UseGuards(JwtAuthGuard)
+  @Patch('reorder')
+  reorder(@Body() dto: ReorderChaptersDto, @CurrentUser() user: UserPayload) {
+    return this.chaptersService.reorder(dto, user.id);
   }
 }

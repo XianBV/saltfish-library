@@ -1,23 +1,18 @@
 {
   "name": "saltfish-library",
   "private": true,
-  "workspaces": [
-    "apps/*",
-    "packages/*"
-  ],
   "scripts": {
-    "dev": "concurrently \"pnpm --filter api dev\" \"pnpm --filter web dev\"",
-    "build": "pnpm --filter api build && pnpm --filter web build",
-    "db:migrate": "pnpm --filter api db:migrate",
-    "db:generate": "pnpm --filter api db:generate",
-    "start": "pnpm --filter api start:prod"
+    "dev": "npm --prefix apps/api run start:dev & npm --prefix apps/web run dev",
+    "build": "npm --prefix apps/api run build && npm --prefix apps/web run build",
+    "db:migrate": "npm --prefix apps/api run db:migrate",
+    "db:generate": "npm --prefix apps/api run db:generate",
+    "start": "npm --prefix apps/api run start:prod"
   },
   "devDependencies": {
+    "typescript": "^5.8.3",
     "@types/node": "^20.0.0",
     "@types/react": "^19.1.6",
-    "@types/react-dom": "^19.1.5",
-    "concurrently": "^8.2.2",
-    "typescript": "^5.8.3"
+    "@types/react-dom": "^19.1.5"
   },
   "dependencies": {
     "@prisma/client": "^5.22.0"
