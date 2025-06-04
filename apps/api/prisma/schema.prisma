@@ -14,6 +14,33 @@ enum Role {
   COAUTHOR
 }
 
+enum NovelStatus {
+  COMPLETED
+  ONGOING
+  HIATUS
+}
+
+enum StorageLocation {
+  SUPABASE
+  R2
+}
+
+enum ListType {
+  SYSTEM
+  CUSTOM
+}
+
+enum TagType {
+  GENRE
+  STATUS_WORK
+  STATUS_TRANSLATION
+  PUBLISH_DATE
+  VOLUME
+  ORIENTATION
+  PERSPECTIVE
+  ERA
+}
+
 model User {
   id             String          @id @default(cuid())
   telegramId     String          @unique @map("telegram_id")
@@ -26,7 +53,6 @@ model User {
   createdAt      DateTime        @default(now()) @map("created_at")
   updatedAt      DateTime        @updatedAt @map("updated_at")
 
-  // Relations
   novels         Novel[]
   lists          List[]
   listItems      ListItem[]
@@ -52,13 +78,11 @@ model Novel {
   wordCount             Int?     @map("word_count")
   originalStatus        NovelStatus @map("original_status")
   translationStatus     NovelStatus @map("translation_status")
-  cover                 String
   isPublic              Boolean  @default(false) @map("is_public")
   shareToken            String?  @unique @map("share_token")
   createdAt             DateTime @default(now()) @map("created_at")
   updatedAt             DateTime @updatedAt @map("updated_at")
 
-  // Relations
   userId        String          @map("user_id")
   user          User            @relation(fields: [userId], references: [id], onDelete: Cascade)
   
@@ -83,7 +107,6 @@ model Chapter {
   createdAt       DateTime @default(now()) @map("created_at")
   updatedAt       DateTime @updatedAt @map("updated_at")
 
-  // Relations
   novelId   String @map("novel_id")
   novel     Novel  @relation(fields: [novelId], references: [id], onDelete: Cascade)
 
@@ -94,8 +117,8 @@ model Author {
   id        String   @id @default(cuid())
   name      String   @unique
   createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
 
-  // Relations
   novelAuthors NovelAuthor[]
 
   @@map("authors")
@@ -122,6 +145,7 @@ model NovelCoauthor {
   user      User     @relation(fields: [userId], references: [id], name: "UserCoauthors")
   userId    String
   createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   @@unique([novelId, userId])
 }
@@ -131,8 +155,8 @@ model Tag {
   name      String   @unique
   type      TagType
   createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
 
-  // Relations
   novelTags NovelTag[]
 
   @@map("tags")
@@ -156,8 +180,8 @@ model List {
   type      ListType
   order     Int      @default(0)
   createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
 
-  // Relations
   userId    String     @map("user_id")
   user      User       @relation(fields: [userId], references: [id], onDelete: Cascade)
   listItems ListItem[]
@@ -169,16 +193,15 @@ model List {
 model ListItem {
   id        String   @id @default(cuid())
   addedAt   DateTime @default(now()) @map("added_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
 
-  // Relations
   listId  String @map("list_id")
   novelId String @map("novel_id")
+  userId  String @map("user_id")
 
-  user    User   @relation(fields: [userId], references: [id])
-  userId  String
-  
   list  List  @relation(fields: [listId], references: [id], onDelete: Cascade)
   novel Novel @relation(fields: [novelId], references: [id], onDelete: Cascade)
+  user  User  @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@unique([listId, novelId])
   @@map("list_items")
@@ -190,42 +213,14 @@ model StatDaily {
   views     Int      @default(0)
   additions Int      @default(0)
   createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
 
-  // Relations
   novelId String @map("novel_id")
   userId  String @map("user_id")
-  
+
   novel Novel @relation(fields: [novelId], references: [id], onDelete: Cascade)
   user  User  @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@unique([novelId, userId, date])
   @@map("stats_daily")
-}
-
-// Enums
-enum NovelStatus {
-  COMPLETED
-  ONGOING
-  HIATUS
-}
-
-enum StorageLocation {
-  SUPABASE
-  R2
-}
-
-enum ListType {
-  SYSTEM
-  CUSTOM
-}
-
-enum TagType {
-  GENRE
-  STATUS_WORK
-  STATUS_TRANSLATION
-  PUBLISH_DATE
-  VOLUME
-  ORIENTATION
-  PERSPECTIVE
-  ERA
 }
