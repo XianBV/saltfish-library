@@ -10,30 +10,55 @@ export class NovelsService {
   async create(userId: string, dto: CreateNovelDto) {
     const { tags, authors, ...novelData } = dto;
 
-    // Create novel
-    const novel = await this.prisma.novel.create({
+    return this.prisma.novel.create({
       data: {
         ...novelData,
         userId,
       },
       include: {
         novelTags: {
-          include: { tag: true }
+          include: { tag: true },
         },
         novelAuthors: {
-          include: { author: true }
+          include: { author: true },
         },
         chapters: {
-          orderBy: { order: 'asc' }
+          orderBy: { order: 'asc' },
         },
         _count: {
-          select: { chapters: true }
-        }
+          select: { chapters: true },
+        },
+      },
+    });
+  }
+
+  async findAll(userId: string, filters: NovelFiltersDto) {
+    return this.prisma.novel.findMany({
+      where: {
+        userId,
+        ...(filters.title && {
+          title: {
+            contains: filters.title,
+            mode: 'insensitive',
+          },
+        }),
+      },
+      include: {
+        novelTags: {
+          include: { tag: true },
+        },
+        novelAuthors: {
+          include: { author: true },
+        },
+        chapters: {
+          orderBy: { order: 'asc' },
+        },
+        _count: {
+          select: { chapters: true },
+        },
       },
       orderBy: filters?.sortBy === 'year' ? { year: 'desc' } : { title: 'asc' },
     });
-
-    return novels;
   }
 
   async findOne(id: string, userId?: string) {
@@ -41,10 +66,10 @@ export class NovelsService {
       where: { id },
       include: {
         novelTags: {
-          include: { tag: true }
+          include: { tag: true },
         },
         novelAuthors: {
-          include: { author: true }
+          include: { author: true },
         },
         chapters: {
           orderBy: { order: 'asc' },
@@ -54,7 +79,7 @@ export class NovelsService {
             volumeArk: true,
             order: true,
             createdAt: true,
-          }
+          },
         },
         user: {
           select: {
@@ -63,11 +88,23 @@ export class NovelsService {
             firstName: true,
             avatarUrl: true,
             bio: true,
-          }
+          },
+        },
+        novelCoauthors: {
+          include: {
+            user: {
+              select: {
+                id: true,
+                username: true,
+                avatarUrl: true,
+                bio: true,
+              },
+            },
+          },
         },
         _count: {
-          select: { chapters: true }
-        }
+          select: { chapters: true },
+        },
       },
     });
 
@@ -75,95 +112,41 @@ export class NovelsService {
       throw new NotFoundException('Новелла не найдена');
     }
 
-    // Check access
-    const hasAccess = !userId || novel.userId === userId || novel.isPublic;
+    const isCoauthor = novel.novelCoauthors.some(c => c.userId === userId);
+    const hasAccess = !userId || novel.userId === userId || novel.isPublic || isCoauthor;
     if (!hasAccess) {
       throw new ForbiddenException('Нет доступа к новелле');
     }
 
-    return novel;
+    return {
+      ...novel,
+      coauthors: novel.novelCoauthors.map(c => c.user),
+    };
   }
 
-  async findByToken(token: string) {
-    const novel = await this.prisma.novel.findUnique({
-      where: { shareToken: token },
-      include: {
-        novelTags: {
-          include: { tag: true }
-        },
-        novelAuthors: {
-          include: { author: true }
-        },
-        chapters: {
-          orderBy: { order: 'asc' },
-          select: {
-            id: true,
-            title: true,
-            volumeArk: true,
-            order: true,
-            createdAt: true,
-          }
-        },
-        user: {
-          select: {
-            id: true,
-            username: true,
-            firstName: true,
-            avatarUrl: true,
-            bio: true,
-          }
-        },
-        _count: {
-          select: { chapters: true }
-        }
-      },
-    });
-
-    if (!novel || !novel.isPublic) {
-      throw new NotFoundException('Новелла не найдена или недоступна');
-    }
-
-    return novel;
-  }
-
-  async update(id: string, userId: string, dto: UpdateNovelDto) {
+  async update(id: string, userId: string, updateNovelDto: UpdateNovelDto) {
     const novel = await this.prisma.novel.findUnique({
       where: { id },
+      include: {
+        novelCoauthors: true,
+      },
     });
 
     if (!novel) {
       throw new NotFoundException('Новелла не найдена');
     }
 
-    if (novel.userId !== userId) {
-      throw new ForbiddenException('Нет прав для редактирования');
+    const isCoauthor = novel.novelCoauthors.some(c => c.userId === userId);
+    const hasAccess = novel.userId === userId || isCoauthor;
+
+    if (!hasAccess) {
+      throw new ForbiddenException('Нет доступа к редактированию');
     }
 
-    const { tags, authors, ...updateData } = dto;
-
-    // Update novel
-    const updatedNovel = await this.prisma.novel.update({
+    return this.prisma.novel.update({
       where: { id },
-      data: updateData,
+      data: updateNovelDto,
     });
-
-    // Handle tags
-    if (tags) {
-      await this.prisma.novelTag.deleteMany({ where: { novelId: id } });
-      if (tags.length > 0) {
-        await this.handleTags(id, tags, userId);
-      }
-    }
-
-    // Handle authors
-    if (authors) {
-      await this.prisma.novelAuthor.deleteMany({ where: { novelId: id } });
-      if (authors.length > 0) {
-        await this.handleAuthors(id, authors, userId);
-      }
-    }
-
-    return this.findOne(id, userId);
   }
 
   async remove(id: string, userId: string) {
@@ -171,111 +154,41 @@ export class NovelsService {
       where: { id },
     });
 
-    if (!novel) {
-      throw new NotFoundException('Новелла не найдена');
+    if (!novel || novel.userId !== userId) {
+      throw new ForbiddenException('Нет доступа к удалению');
     }
 
-    if (novel.userId !== userId) {
-      throw new ForbiddenException('Нет прав для удаления');
-    }
-
-    await this.prisma.novel.delete({
-      where: { id },
-    });
-
-    return { message: 'Новелла удалена' };
+    return this.prisma.novel.delete({ where: { id } });
   }
 
   async generateShareToken(id: string, userId: string) {
-    const novel = await this.prisma.novel.findUnique({
-      where: { id },
-    });
-
-    if (!novel) {
-      throw new NotFoundException('Новелла не найдена');
+    const novel = await this.prisma.novel.findUnique({ where: { id } });
+    if (!novel || novel.userId !== userId) {
+      throw new ForbiddenException('Нет доступа к генерации ссылки');
     }
 
-    if (novel.userId !== userId) {
-      throw new ForbiddenException('Нет прав для создания ссылки');
-    }
-
-    const shareToken = randomBytes(32).toString('hex');
-
-    await this.prisma.novel.update({
+    const token = randomBytes(16).toString('hex');
+    return this.prisma.novel.update({
       where: { id },
       data: {
-        shareToken,
         isPublic: true,
+        shareToken: token,
       },
     });
-
-    return { shareToken, shareUrl: `${process.env.FRONTEND_URL}/novels/${shareToken}` };
   }
 
   async revokeShareToken(id: string, userId: string) {
-    const novel = await this.prisma.novel.findUnique({
-      where: { id },
-    });
-
-    if (!novel) {
-      throw new NotFoundException('Новелла не найдена');
+    const novel = await this.prisma.novel.findUnique({ where: { id } });
+    if (!novel || novel.userId !== userId) {
+      throw new ForbiddenException('Нет доступа к отзыву ссылки');
     }
 
-    if (novel.userId !== userId) {
-      throw new ForbiddenException('Нет прав для отзыва ссылки');
-    }
-
-    await this.prisma.novel.update({
+    return this.prisma.novel.update({
       where: { id },
       data: {
-        shareToken: null,
         isPublic: false,
+        shareToken: null,
       },
     });
-
-    return { message: 'Публичный доступ отключен' };
-  }
-
-  private async handleTags(novelId: string, tagNames: string[], userId: string) {
-    for (const tagName of tagNames) {
-      let tag = await this.prisma.tag.findUnique({
-        where: { name: tagName },
-      });
-
-      if (!tag) {
-        tag = await this.prisma.tag.create({
-          data: { name: tagName, type: 'GENRE' },
-        });
-      }
-
-      await this.prisma.novelTag.create({
-        data: {
-          novelId,
-          tagId: tag.id,
-        },
-      });
-    }
-  }
-
-  private async handleAuthors(novelId: string, authorNames: string[], userId: string) {
-    for (const authorName of authorNames) {
-      let author = await this.prisma.author.findUnique({
-        where: { name: authorName },
-      });
-
-      if (!author) {
-        author = await this.prisma.author.create({
-          data: { name: authorName },
-        });
-      }
-
-      await this.prisma.novelAuthor.create({
-        data: {
-          novelId,
-          authorId: author.id,
-          userId,
-        },
-      });
-    }
   }
 }

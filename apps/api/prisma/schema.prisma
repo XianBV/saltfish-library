@@ -15,23 +15,24 @@ enum Role {
 }
 
 model User {
-  id            String   @id @default(cuid())
-  telegramId    String   @unique @map("telegram_id")
-  username      String?
-  firstName     String?  @map("first_name")
-  lastName      String?  @map("last_name")
-  bio           String?
-  avatarUrl     String?  @map("avatar_url")
-  role          Role     @default(READER)
-  createdAt     DateTime @default(now()) @map("created_at")
-  updatedAt     DateTime @updatedAt @map("updated_at")
+  id             String          @id @default(cuid())
+  telegramId     String          @unique @map("telegram_id")
+  username       String?
+  firstName      String?         @map("first_name")
+  lastName       String?         @map("last_name")
+  bio            String?
+  avatarUrl      String?         @map("avatar_url")
+  role           Role            @default(READER)
+  createdAt      DateTime        @default(now()) @map("created_at")
+  updatedAt      DateTime        @updatedAt @map("updated_at")
 
   // Relations
-  novels        Novel[]
-  lists         List[]
-  listItems     ListItem[]
-  novelAuthors  NovelAuthor[]
-  statsDaily    StatDaily[]
+  novels         Novel[]
+  lists          List[]
+  listItems      ListItem[]
+  novelAuthors   NovelAuthor[]
+  statsDaily     StatDaily[]
+  novelCoauthors NovelCoauthor[] @relation(name: "UserCoauthors")
 
   @@map("users")
 }
@@ -58,14 +59,15 @@ model Novel {
   updatedAt             DateTime @updatedAt @map("updated_at")
 
   // Relations
-  userId        String   @map("user_id")
-  user          User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId        String          @map("user_id")
+  user          User            @relation(fields: [userId], references: [id], onDelete: Cascade)
   
   chapters      Chapter[]
   novelTags     NovelTag[]
   novelAuthors  NovelAuthor[]
   listItems     ListItem[]
   statsDaily    StatDaily[]
+  coauthors     NovelCoauthor[] @relation(name: "NovelCoauthors")
 
   @@map("novels")
 }
@@ -111,6 +113,17 @@ model NovelAuthor {
 
   @@unique([novelId, authorId])
   @@map("novel_authors")
+}
+
+model NovelCoauthor {
+  id        String   @id @default(uuid())
+  novel     Novel    @relation(fields: [novelId], references: [id], name: "NovelCoauthors")
+  novelId   String
+  user      User     @relation(fields: [userId], references: [id], name: "UserCoauthors")
+  userId    String
+  createdAt DateTime @default(now())
+
+  @@unique([novelId, userId])
 }
 
 model Tag {
@@ -160,6 +173,9 @@ model ListItem {
   // Relations
   listId  String @map("list_id")
   novelId String @map("novel_id")
+
+  user    User   @relation(fields: [userId], references: [id])
+  userId  String
   
   list  List  @relation(fields: [listId], references: [id], onDelete: Cascade)
   novel Novel @relation(fields: [novelId], references: [id], onDelete: Cascade)
