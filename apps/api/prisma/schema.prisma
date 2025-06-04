@@ -7,6 +7,13 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
+enum Role {
+  READER
+  AUTHOR
+  ADMIN
+  COAUTHOR
+}
+
 model User {
   id            String   @id @default(cuid())
   telegramId    String   @unique @map("telegram_id")
@@ -15,12 +22,14 @@ model User {
   lastName      String?  @map("last_name")
   bio           String?
   avatarUrl     String?  @map("avatar_url")
+  role          Role     @default(READER)
   createdAt     DateTime @default(now()) @map("created_at")
   updatedAt     DateTime @updatedAt @map("updated_at")
 
   // Relations
   novels        Novel[]
   lists         List[]
+  listItems     ListItem[]
   novelAuthors  NovelAuthor[]
   statsDaily    StatDaily[]
 
@@ -34,11 +43,15 @@ model Novel {
   alternativeTitles     String[] @map("alternative_titles")
   description           String?
   coverUrl              String?  @map("cover_url")
+  orientation           String?
+  perspective           String?
+  era                   String?
   year                  Int?
   chaptersInOriginal    Int      @map("chapters_in_original")
   wordCount             Int?     @map("word_count")
   originalStatus        NovelStatus @map("original_status")
   translationStatus     NovelStatus @map("translation_status")
+  cover                 String
   isPublic              Boolean  @default(false) @map("is_public")
   shareToken            String?  @unique @map("share_token")
   createdAt             DateTime @default(now()) @map("created_at")

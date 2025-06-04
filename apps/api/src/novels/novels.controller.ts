@@ -14,12 +14,15 @@ import { NovelsService } from './novels.service';
 import { AuthGuard } from '../auth/auth.guard';
 import { CurrentUser } from '../auth/auth.decorator';
 import { CreateNovelDto, UpdateNovelDto, NovelFiltersDto } from './dto';
+import { Roles } from '../auth/roles.decorator';
+import { Role } from '../auth/role.enum';
 
 @ApiTags('novels')
 @Controller('novels')
 export class NovelsController {
   constructor(private readonly novelsService: NovelsService) {}
 
+  @Roles(Role.AUTHOR, Role.ADMIN)
   @Post()
   @UseGuards(AuthGuard)
   @ApiBearerAuth()

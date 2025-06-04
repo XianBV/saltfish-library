@@ -15,11 +15,14 @@ import { CreateChapterDto, UpdateChapterDto, ReorderChaptersDto } from './dto';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { CurrentUser } from '../auth/current-user.decorator';
 import { UserPayload } from '../auth/types';
+import { Roles } from '../auth/roles.decorator';
+import { Role } from '../auth/role.enum';
 
 @Controller('chapters')
 export class ChaptersController {
   constructor(private readonly chaptersService: ChaptersService) {}
 
+  @Roles(Role.AUTHOR, Role.COAUTHOR, Role.ADMIN)
   @UseGuards(JwtAuthGuard)
   @Post()
   create(@Body() dto: CreateChapterDto, @CurrentUser() user: UserPayload) {
